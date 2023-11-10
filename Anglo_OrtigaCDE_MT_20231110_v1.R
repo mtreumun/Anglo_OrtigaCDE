@@ -1,9 +1,3 @@
-# Instalar paquetes necesarios
-# install.packages("sf")
-# install.packages("ggplot2")
-# install.packages("gridExtra")
-# install.packages("classInt")
-
 # Cargar las librerías
 library(sf)
 library(ggplot2)
@@ -27,42 +21,60 @@ shp <- shp[!is.na(shp$MEAN) & !is.na(shp$STD) & !is.na(shp$AREA), ]
 shp$MEAN_per_area <- shp$MEAN / shp$AREA
 shp$MEAN_normalized_STD <- (shp$MEAN - mean(shp$MEAN)) / shp$STD
 
-# Calcular intervalos para las categorías nuevamente
-num_categories <- 10
-breaks_MEAN <- classIntervals(shp$MEAN, n = num_categories, style = "quantile")$brks
-breaks_MEAN_per_area <- classIntervals(shp$MEAN_per_area, n = num_categories, style = "quantile")$brks
-breaks_MEAN_normalized_STD <- classIntervals(shp$MEAN_normalized_STD, n = num_categories, style = "quantile")$brks
+# Calcular el rango y definir los intervalos
+range_MEAN <- max(shp$MEAN, na.rm = TRUE) - min(shp$MEAN, na.rm = TRUE)
+range_MEAN_per_area <- max(shp$MEAN_per_area, na.rm = TRUE) - min(shp$MEAN_per_area, na.rm = TRUE)
+range_MEAN_normalized_STD <- max(shp$MEAN_normalized_STD, na.rm = TRUE) - min(shp$MEAN_normalized_STD, na.rm = TRUE)
 
-# Etiquetas para las categorías
-category_labels <- c("Excepcionalmente bajo", "Extremadamente bajo", "Muy bajo", "Bajo",
-                     "Moderadamente bajo", "Medio", "Moderadamente alto", "Alto",
-                     "Muy alto", "Extremadamente alto")
+interval_MEAN <- range_MEAN / 10
+interval_MEAN_per_area <- range_MEAN_per_area / 10
+interval_MEAN_normalized_STD <- range_MEAN_normalized_STD / 10
 
-# Crear factores basados en intervalos geométricos
-shp$MEAN_cat <- cut(shp$MEAN, breaks = breaks_MEAN, include.lowest = TRUE, labels = category_labels)
-shp$MEAN_per_area_cat <- cut(shp$MEAN_per_area, breaks = breaks_MEAN_per_area, include.lowest = TRUE, labels = category_labels)
-shp$MEAN_normalized_STD_cat <- cut(shp$MEAN_normalized_STD, breaks = breaks_MEAN_normalized_STD, include.lowest = TRUE, labels = category_labels)
+# Definir los intervalos para las categorías
+breaks_MEAN <- seq(min(shp$MEAN, na.rm = TRUE), max(shp$MEAN, na.rm = TRUE), by = interval_MEAN)
+breaks_MEAN_per_area <- seq(min(shp$MEAN_per_area, na.rm = TRUE), max(shp$MEAN_per_area, na.rm = TRUE), by = interval_MEAN_per_area)
+breaks_MEAN_normalized_STD <- seq(min(shp$MEAN_normalized_STD, na.rm = TRUE), max(shp$MEAN_normalized_STD, na.rm = TRUE), by = interval_MEAN_normalized_STD)
 
-# Crear mapas temáticos basados en las categorías con etiquetas descriptivas
+# Crear factores basados en intervalos geométricos con etiquetas numéricas
+shp$MEAN_cat <- cut(shp$MEAN, breaks = breaks_MEAN, include.lowest = TRUE, labels = FALSE)
+shp$MEAN_per_area_cat <- cut(shp$MEAN_per_area, breaks = breaks_MEAN_per_area, include.lowest = TRUE, labels = FALSE)
+shp$MEAN_normalized_STD_cat <- cut(shp$MEAN_normalized_STD, breaks = breaks_MEAN_normalized_STD, include.lowest = TRUE, labels = FALSE)
+
+# Función para crear etiquetas de intervalos
+create_interval_labels <- function(breaks) {
+  intervals <- length(breaks) - 1
+  labels <- vector("list", intervals)
+  for (i in 1:intervals) {
+    labels[[i]] <- paste(format(round(breaks[i], 2)), "-", format(round(breaks[i + 1], 2)))
+  }
+  return(labels)
+}
+
+# Crear etiquetas de intervalos para cada conjunto de datos
+labels_MEAN <- create_interval_labels(breaks_MEAN)
+labels_MEAN_per_area <- create_interval_labels(breaks_MEAN_per_area)
+labels_MEAN_normalized_STD <- create_interval_labels(breaks_MEAN_normalized_STD)
+
+# Crear mapas temáticos con etiquetas de intervalos
 plot_shp_MEAN_cat <- ggplot(data = shp) +
-  geom_sf(aes(fill = MEAN_cat), color = NA) + 
-  scale_fill_manual(values = colorRampPalette(c("green", "red"))(num_categories), labels = category_labels) +
+  geom_sf(aes(fill = cut(MEAN, breaks = breaks_MEAN, include.lowest = TRUE, labels = labels_MEAN)), color = NA) +
+  scale_fill_manual(values = colorRampPalette(c("green", "red"))(length(labels_MEAN)), labels = labels_MEAN) +
   theme_minimal() +
-  labs(fill = "Categoría", title = "Mapa de MEAN Categorizado") +
+  labs(fill = "Rango", title = "Mapa de MEAN Categorizado") +
   theme(legend.position = "bottom")
 
 plot_shp_MEAN_per_area_cat <- ggplot(data = shp) +
-  geom_sf(aes(fill = MEAN_per_area_cat), color = NA) + 
-  scale_fill_manual(values = colorRampPalette(c("green", "red"))(num_categories), labels = category_labels) +
+  geom_sf(aes(fill = cut(MEAN_per_area, breaks = breaks_MEAN_per_area, include.lowest = TRUE, labels = labels_MEAN_per_area)), color = NA) +
+  scale_fill_manual(values = colorRampPalette(c("green", "red"))(length(labels_MEAN_per_area)), labels = labels_MEAN_per_area) +
   theme_minimal() +
-  labs(fill = "Categoría", title = "Mapa de MEAN por Área Categorizado") +
+  labs(fill = "Rango", title = "Mapa de MEAN por Área Categorizado") +
   theme(legend.position = "bottom")
 
 plot_shp_MEAN_normalized_STD_cat <- ggplot(data = shp) +
-  geom_sf(aes(fill = MEAN_normalized_STD_cat), color = NA) + 
-  scale_fill_manual(values = colorRampPalette(c("green", "red"))(num_categories), labels = category_labels) +
+  geom_sf(aes(fill = cut(MEAN_normalized_STD, breaks = breaks_MEAN_normalized_STD, include.lowest = TRUE, labels = labels_MEAN_normalized_STD)), color = NA) +
+  scale_fill_manual(values = colorRampPalette(c("green", "red"))(length(labels_MEAN_normalized_STD)), labels = labels_MEAN_normalized_STD) +
   theme_minimal() +
-  labs(fill = "Categoría", title = "Mapa de MEAN Normalizado por STD Categorizado") +
+  labs(fill = "Rango", title = "Mapa de MEAN Normalizado por STD Categorizado") +
   theme(legend.position = "bottom")
 
 # Mostrar los mapas
