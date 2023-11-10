@@ -161,12 +161,15 @@ plot_shp_MEAN_per_area_cat <- ggplot(data = shp) +
     legend.position = "bottom",
     legend.direction = "horizontal",
     legend.title = element_blank(),
-    legend.text = element_text(size = 5, angle = 90),
+    legend.text = element_text(size = 5, angle = 90), # Reducir tamaño y rotar las etiquetas de la leyenda
     plot.title = element_text(size = 9, hjust = 0.5, face = "bold"),
     plot.margin = margin(5, 5, 5, 5),
-    axis.text.x = element_blank(), # Ocultar las etiquetas del eje x para evitar repetición
-    axis.text.y = element_blank(), # Ocultar las etiquetas del eje y para evitar repetición
-    axis.ticks = element_blank()
+    axis.text.x = element_text(size = 6, angle = 90, hjust = 1, vjust = 0.5),
+    axis.text.y = element_text(size = 6, angle = 90, hjust = 1, vjust = 0.5),
+    axis.ticks = element_blank(),
+    legend.key.size = unit(1, 'lines'), # Ajustar tamaño de las cajas de leyenda para dar más espacio entre etiquetas
+    legend.spacing.x = unit(0.1, 'cm'), # Espaciado entre las leyendas
+    legend.margin = margin(t = 0, b = 0, unit = 'pt') # Reducir el margen alrededor de la leyenda
   ) +
   labs(fill = "", title = "Mapa NDVI Norm. Área")
 
@@ -196,12 +199,15 @@ plot_shp_MEAN_normalized_STD_cat <- ggplot(data = shp) +
     legend.position = "bottom",
     legend.direction = "horizontal",
     legend.title = element_blank(),
-    legend.text = element_text(size = 5, angle = 90),
+    legend.text = element_text(size = 5, angle = 90), # Reducir tamaño y rotar las etiquetas de la leyenda
     plot.title = element_text(size = 9, hjust = 0.5, face = "bold"),
     plot.margin = margin(5, 5, 5, 5),
-    axis.text.x = element_blank(), # Ocultar las etiquetas del eje x para evitar repetición
-    axis.text.y = element_blank(), # Ocultar las etiquetas del eje y para evitar repetición
-    axis.ticks = element_blank()
+    axis.text.x = element_text(size = 6, angle = 90, hjust = 1, vjust = 0.5),
+    axis.text.y = element_text(size = 6, angle = 90, hjust = 1, vjust = 0.5),
+    axis.ticks = element_blank(),
+    legend.key.size = unit(1, 'lines'), # Ajustar tamaño de las cajas de leyenda para dar más espacio entre etiquetas
+    legend.spacing.x = unit(0.1, 'cm'), # Espaciado entre las leyendas
+    legend.margin = margin(t = 0, b = 0, unit = 'pt') # Reducir el margen alrededor de la leyenda
   ) +
   labs(fill = "", title = "Mapa NDVI Norm. por STD")
 
