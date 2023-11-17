@@ -13,21 +13,24 @@ library(classInt)
 library(gridExtra)
 
 # Leer el archivo shapefile
-shapefile_path <- "E:/ANGLO_Ortiga CDE/CAPAS/Unidades_vegetación_Ortiga_Ajuste_Dron_noviembre_2023_ME_MT_20231108_v1.shp"
+shapefile_path <- "E:/ANGLO_Ortiga CDE/CAPAS/Unidades_vegetación_Ortiga_Ajuste_Dron_noviembre_2023_ME_MT_20231116_v1.shp"
 shp <- st_read(shapefile_path)
 
-# Convertir a numérico si no lo son ya y manejar NAs
+# Convertir a numérico y NAs
 shp$MEAN <- as.numeric(shp$MEAN)
 shp$STD <- as.numeric(shp$STD)
 shp$AREA <- as.numeric(shp$AREA)
 shp <- shp[shp$AREA != 0, ]
 
-# Asumiendo que deseas excluir los NAs, actualiza el dataset para excluirlos
+# Excluir los NAs, actualiza el dataset
 shp <- shp[!is.na(shp$MEAN) & !is.na(shp$STD) & !is.na(shp$AREA), ]
 
-# Recalcular la normalización por área y por STD
-shp$MEAN_per_area <- shp$MEAN / shp$AREA
-shp$MEAN_normalized_STD <- (shp$MEAN - mean(shp$MEAN)) / shp$STD
+# Recalcula la normalización por área y por STD
+shp$MEAN_per_area <- shp$MEAN / (shp$AREA/10000)
+shp$MEAN_normalized_STD <- shp$MEAN / shp$STD
+#shp$MEAN_normalized_STD <- (shp$MEAN - mean(shp$MEAN)) / (shp$AREA)
+#shp$MEAN_normalized_STD <- (shp$MEAN - mean(shp$MEAN)) / shp$STD
+
 
 # Calcular el rango y definir los intervalos
 range_MEAN <- max(shp$MEAN, na.rm = TRUE) - min(shp$MEAN, na.rm = TRUE)
@@ -92,21 +95,21 @@ labels_MEAN_normalized_STD <- create_interval_labels(breaks_MEAN_normalized_STD)
 
 # Histograma para MEAN
 #hist_shp_MEAN <- ggplot(data = shp, aes(x = MEAN)) +
-  #geom_histogram(bins = 30, fill = "blue", color = "black") +
-  #theme_minimal() +
-  #ggtitle("Histograma NDVI")
+#geom_histogram(bins = 30, fill = "blue", color = "black") +
+#theme_minimal() +
+#ggtitle("Histograma NDVI")
 
 # Histograma para MEAN_per_area
 #hist_shp_MEAN_per_area <- ggplot(data = shp, aes(x = MEAN_per_area)) +
-  #geom_histogram(bins = 30, fill = "blue", color = "black") +
-  #theme_minimal() +
-  #ggtitle("Histograma de MEAN por Área")
+#geom_histogram(bins = 30, fill = "blue", color = "black") +
+#theme_minimal() +
+#ggtitle("Histograma de MEAN por Área")
 
 # Histograma para MEAN_normalized_STD
 #hist_shp_MEAN_normalized_STD <- ggplot(data = shp, aes(x = MEAN_normalized_STD)) +
-  #geom_histogram(bins = 30, fill = "blue", color = "black") +
-  #theme_minimal() +
-  #ggtitle("Histograma de MEAN Normalizado por STD")
+#geom_histogram(bins = 30, fill = "blue", color = "black") +
+#theme_minimal() +
+#ggtitle("Histograma de MEAN Normalizado por STD")
 
 # Mostrar mapas y histogramas juntos
 #grid.arrange(plot_shp_MEAN_cat, hist_shp_MEAN, ncol = 2)
@@ -136,18 +139,21 @@ plot_shp_MEAN_cat <- ggplot(data = shp) +
 
 # Mejorar el histograma para MEAN
 hist_shp_MEAN <- ggplot(data = shp, aes(x = MEAN)) +
-  geom_histogram(bins = 30, fill = "blue", color = "black") +
+  geom_histogram(bins = 10, fill = "blue", color = "black") +
   theme_minimal() +
   theme(
     plot.title = element_text(size = 9, hjust = 0.5, face = "bold"),
-    axis.text.x = element_text(size = 6, angle = 90, vjust = 0.5),
-    axis.text.y = element_text(size = 6, angle = 90, vjust = 0.5),
-    #axis.text.y = element_blank(), # Ocultar las etiquetas del eje y para evitar repetición
-    axis.title.x = element_blank(), # Ocultar el título del eje x
-    axis.title.y = element_blank(), # Ocultar el título del eje y
+    axis.text.x = element_text(size = 9, angle = 90, vjust = 0.5),
+    axis.text.y = element_text(size = 9, angle = 90, vjust = 0.5),
+    #axis.text.y = element_blank(), # Ocultar las etiquetas del eje y
+    #axis.title.x = element_blank(), # Ocultar el título del eje x
     plot.margin = margin(5, 5, 5, 5)
   ) +
-  ggtitle("Histograma NDVI")
+  ggtitle("Histograma NDVI")+
+  xlab("Valor NDVI") + # Cambiar la etiqueta del eje x +
+  ylab("Número de unidades")   # Cambiar la etiqueta del eje y
+
+hist_shp_MEAN
 
 # Combinar el mapa mejorado y el histograma en una sola visualización
 grid.arrange(plot_shp_MEAN_cat, hist_shp_MEAN, ncol = 2, widths = c(3, 2))
@@ -175,17 +181,37 @@ plot_shp_MEAN_per_area_cat <- ggplot(data = shp) +
 
 # Mejorar el histograma para MEAN per Area
 hist_shp_MEAN_per_area <- ggplot(data = shp, aes(x = MEAN_per_area)) +
-  geom_histogram(bins = 30, fill = "blue", color = "black") +
+  geom_histogram(bins = 10, fill = "blue", color = "black") +
   theme_minimal() +
   theme(
     plot.title = element_text(size = 9, hjust = 0.5, face = "bold"),
-    axis.text.x = element_text(size = 6, angle = 90, vjust = 0.5),
-    axis.text.y = element_text(size = 6, angle = 90, vjust = 0.5),
-    #axis.text.y = element_blank(), # Ocultar las etiquetas del eje y para evitar repetición
-    axis.title.x = element_blank(), # Ocultar el título del eje x
-    axis.title.y = element_blank(), # Ocultar el título del eje y
+    axis.text.x = element_text(size = 9, angle = 90, vjust = 0.5),
+    axis.text.y = element_text(size = 9, angle = 90, vjust = 0.5),
+    #axis.text.y = element_blank(), # Ocultar las etiquetas del eje y
+    #axis.title.x = element_blank(), # Ocultar el título del eje x
+    plot.margin = margin(5, 5, 5, 5)
   ) +
-  ggtitle("Histograma NDVI Norm. Área")
+  ggtitle("Histograma NDVI Norm. con el área")+
+  xlab("Valor NDVI/Ha") + # Cambiar la etiqueta del eje x +
+  ylab("Número de unidades")   # Cambiar la etiqueta del eje y
+
+hist_shp_MEAN_per_area
+
+# Boxplot para MEAN per Area
+boxplot_shp_MEAN_per_area <- ggplot(data = shp, aes(y = MEAN_per_area)) +
+  geom_boxplot(fill = "blue", color = "black") +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(size = 9, hjust = 0.5, face = "bold"),
+    axis.text.x = element_text(size = 9, angle = 90, vjust = 0.5),
+    axis.text.y = element_text(size = 9, angle = 90, vjust = 0.5),
+    plot.margin = margin(5, 5, 5, 5)
+  ) +
+  ggtitle("Boxplot NDVI Norm. con el área") +
+  xlab("") + # Ocultar la etiqueta del eje x si no es necesario
+  ylab("Valor NDVI/Ha") # Cambiar la etiqueta del eje y
+
+boxplot_shp_MEAN_per_area
 
 # Combinar el mapa y el histograma para MEAN per Area
 grid.arrange(plot_shp_MEAN_per_area_cat, hist_shp_MEAN_per_area, ncol = 2, widths = c(3, 2))
@@ -213,18 +239,38 @@ plot_shp_MEAN_normalized_STD_cat <- ggplot(data = shp) +
 
 # Mejorar el histograma para MEAN Normalizado por STD
 hist_shp_MEAN_normalized_STD <- ggplot(data = shp, aes(x = MEAN_normalized_STD)) +
-  geom_histogram(bins = 30, fill = "blue", color = "black") +
+  geom_histogram(bins = 10, fill = "blue", color = "black") +
   theme_minimal() +
   theme(
     plot.title = element_text(size = 9, hjust = 0.5, face = "bold"),
-    axis.text.x = element_text(size = 6, angle = 90, vjust = 0.5),
-    axis.text.y = element_text(size = 6, angle = 90, vjust = 0.5),
-    #axis.text.y = element_blank(), # Ocultar las etiquetas del eje y para evitar repetición
-    axis.title.x = element_blank(), # Ocultar el título del eje x
-    axis.title.y = element_blank(), # Ocultar el título del eje y
+    axis.text.x = element_text(size = 9, angle = 90, vjust = 0.5),
+    axis.text.y = element_text(size = 9, angle = 90, vjust = 0.5),
+    #axis.text.y = element_blank(), # Ocultar las etiquetas del eje y
+    #axis.title.x = element_blank(), # Ocultar el título del eje x
     plot.margin = margin(5, 5, 5, 5)
   ) +
-  ggtitle("Histograma NDVI Norm. STD ")
+  ggtitle("Histograma NDVI Norm. con la desv. estándar")+
+  xlab("Valor NDVI/STD") + # Cambiar la etiqueta del eje x +
+  ylab("Número de unidades")   # Cambiar la etiqueta del eje y
+
+hist_shp_MEAN_normalized_STD
+
+# Boxplot para MEAN Normalizado por STD
+boxplot_shp_MEAN_normalized_STD <- ggplot(data = shp, aes(y = MEAN_normalized_STD)) +
+  geom_boxplot(fill = "blue", color = "black") +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(size = 9, hjust = 0.5, face = "bold"),
+    axis.text.x = element_text(size = 9, angle = 90, vjust = 0.5),
+    axis.text.y = element_text(size = 9, angle = 90, vjust = 0.5),
+    plot.margin = margin(5, 5, 5, 5)
+  ) +
+  ggtitle("Boxplot NDVI Norm. con la desv. estándar") +
+  xlab("") + # Ocultar la etiqueta del eje x si no es necesario
+  ylab("Valor NDVI/STD") # Cambiar la etiqueta del eje y
+
+boxplot_shp_MEAN_normalized_STD
+
 
 # Combinar el mapa y el histograma para MEAN Normalizado por STD
 grid.arrange(plot_shp_MEAN_normalized_STD_cat, hist_shp_MEAN_normalized_STD, ncol = 2, widths = c(3, 2))
