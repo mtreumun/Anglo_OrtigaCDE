@@ -62,7 +62,7 @@ output_path <- "E:/ANGLO_Ortiga CDE/CAPAS/UnidadesVegetacionOrtiga_Actualizacion
 st_write(shp_reducido, output_path)
 
 #################################################################################################################
-#GRAFICA DE DECILES TOTAL
+# GRAFICA DE DECILES TOTAL
 
 # Calcular el área total por decil para z2023 y z2024
 area_por_decil_2023 <- shp %>%
@@ -97,7 +97,10 @@ combined_barplot <- ggplot(combined_data, aes(x = decile, y = area_total, fill =
 print(combined_barplot)
 
 ###################################################################################################################
-#MATORRAL-VEGA
+# MATORRAL-VEGA
+
+# Crear un dataframe completo con todos los deciles del 1 al 11
+todos_los_deciles <- data.frame(decile = as.factor(1:10))
 
 # Filtrar los datos para Tipo_linea = "Matorral - vega"
 shp_matorral_vega <- shp[shp$Tipo_linea == "Matorral - vega", ]
@@ -118,11 +121,14 @@ area_por_decil_2024_matorral_vega <- shp_matorral_vega %>%
 # Combinar los datos en un solo dataframe
 combined_data_matorral_vega <- rbind(area_por_decil_2023_matorral_vega, area_por_decil_2024_matorral_vega)
 
-# Convertir los deciles a factor para el gráfico
-combined_data_matorral_vega$decile <- as.factor(combined_data_matorral_vega$decile)
+# Unir los datos combinados con el dataframe de todos los deciles para asegurarse de que todos los deciles estén presentes
+combined_data_matorral_vega_completo <- merge(todos_los_deciles, combined_data_matorral_vega, by = "decile", all.x = TRUE)
+
+# Convertir los valores NA en 0 para el área total
+combined_data_matorral_vega_completo$area_total[is.na(combined_data_matorral_vega_completo$area_total)] <- 0
 
 # Crear el gráfico combinado
-combined_barplot_matorral_vega <- ggplot(combined_data_matorral_vega, aes(x = decile, y = area_total, fill = as.factor(year))) +
+combined_barplot_matorral_vega_completo <- ggplot(combined_data_matorral_vega_completo, aes(x = decile, y = area_total, fill = as.factor(year))) +
   geom_bar(stat = "identity", position = "dodge") +
   scale_fill_manual(values = c("2023" = "red", "2024" = "cyan")) +
   labs(title = "Categorías de NDVI para Matorral - vega",
@@ -132,10 +138,10 @@ combined_barplot_matorral_vega <- ggplot(combined_data_matorral_vega, aes(x = de
   theme_minimal()
 
 # Mostrar el gráfico
-print(combined_barplot_matorral_vega)
+print(combined_barplot_matorral_vega_completo)
 
 ###################################################################################################################
-#Vega en cojín - matorral
+# Vega en cojín - matorral
 
 # Filtrar los datos para Tipo_linea = "Vega en cojín - matorral"
 shp_vega_cojin_matorral <- shp[shp$Tipo_linea == "Vega en cojín - matorral", ]
@@ -156,11 +162,14 @@ area_por_decil_2024_vega_cojin_matorral <- shp_vega_cojin_matorral %>%
 # Combinar los datos en un solo dataframe
 combined_data_vega_cojin_matorral <- rbind(area_por_decil_2023_vega_cojin_matorral, area_por_decil_2024_vega_cojin_matorral)
 
-# Convertir los deciles a factor para el gráfico
-combined_data_vega_cojin_matorral$decile <- as.factor(combined_data_vega_cojin_matorral$decile)
+# Unir los datos combinados con el dataframe de todos los deciles para asegurarse de que todos los deciles estén presentes
+combined_data_vega_cojin_matorral_completo <- merge(todos_los_deciles, combined_data_vega_cojin_matorral, by = "decile", all.x = TRUE)
+
+# Convertir los valores NA en 0 para el área total
+combined_data_vega_cojin_matorral_completo$area_total[is.na(combined_data_vega_cojin_matorral_completo$area_total)] <- 0
 
 # Crear el gráfico combinado
-combined_barplot_vega_cojin_matorral <- ggplot(combined_data_vega_cojin_matorral, aes(x = decile, y = area_total, fill = as.factor(year))) +
+combined_barplot_vega_cojin_matorral_completo <- ggplot(combined_data_vega_cojin_matorral_completo, aes(x = decile, y = area_total, fill = as.factor(year))) +
   geom_bar(stat = "identity", position = "dodge") +
   scale_fill_manual(values = c("2023" = "red", "2024" = "cyan")) +
   labs(title = "Categorías de NDVI para Vega en cojín - matorral",
@@ -170,11 +179,10 @@ combined_barplot_vega_cojin_matorral <- ggplot(combined_data_vega_cojin_matorral
   theme_minimal()
 
 # Mostrar el gráfico
-print(combined_barplot_vega_cojin_matorral)
-
+print(combined_barplot_vega_cojin_matorral_completo)
 
 #####################################################################################################################
-#Vega en cojin
+# Vega en cojín
 
 # Filtrar los datos para Tipo_linea = "Vega en cojín"
 shp_vega_cojin <- shp[shp$Tipo_linea == "Vega en cojín", ]
@@ -195,11 +203,14 @@ area_por_decil_2024_vega_cojin <- shp_vega_cojin %>%
 # Combinar los datos en un solo dataframe
 combined_data_vega_cojin <- rbind(area_por_decil_2023_vega_cojin, area_por_decil_2024_vega_cojin)
 
-# Convertir los deciles a factor para el gráfico
-combined_data_vega_cojin$decile <- as.factor(combined_data_vega_cojin$decile)
+# Unir los datos combinados con el dataframe de todos los deciles para asegurarse de que todos los deciles estén presentes
+combined_data_vega_cojin_completo <- merge(todos_los_deciles, combined_data_vega_cojin, by = "decile", all.x = TRUE)
+
+# Convertir los valores NA en 0 para el área total
+combined_data_vega_cojin_completo$area_total[is.na(combined_data_vega_cojin_completo$area_total)] <- 0
 
 # Crear el gráfico combinado
-combined_barplot_vega_cojin <- ggplot(combined_data_vega_cojin, aes(x = decile, y = area_total, fill = as.factor(year))) +
+combined_barplot_vega_cojin_completo <- ggplot(combined_data_vega_cojin_completo, aes(x = decile, y = area_total, fill = as.factor(year))) +
   geom_bar(stat = "identity", position = "dodge") +
   scale_fill_manual(values = c("2023" = "red", "2024" = "cyan")) +
   labs(title = "Categorías de NDVI para Vega en cojín",
@@ -209,10 +220,10 @@ combined_barplot_vega_cojin <- ggplot(combined_data_vega_cojin, aes(x = decile, 
   theme_minimal()
 
 # Mostrar el gráfico
-print(combined_barplot_vega_cojin)
+print(combined_barplot_vega_cojin_completo)
 
 #####################################################################################################################
-#Vega - matorral
+# Vega - matorral
 
 # Filtrar los datos para Tipo_linea = "Vega - matorral"
 shp_vega_matorral <- shp[shp$Tipo_linea == "Vega - matorral", ]
@@ -233,11 +244,14 @@ area_por_decil_2024_vega_matorral <- shp_vega_matorral %>%
 # Combinar los datos en un solo dataframe
 combined_data_vega_matorral <- rbind(area_por_decil_2023_vega_matorral, area_por_decil_2024_vega_matorral)
 
-# Convertir los deciles a factor para el gráfico
-combined_data_vega_matorral$decile <- as.factor(combined_data_vega_matorral$decile)
+# Unir los datos combinados con el dataframe de todos los deciles para asegurarse de que todos los deciles estén presentes
+combined_data_vega_matorral_completo <- merge(todos_los_deciles, combined_data_vega_matorral, by = "decile", all.x = TRUE)
+
+# Convertir los valores NA en 0 para el área total
+combined_data_vega_matorral_completo$area_total[is.na(combined_data_vega_matorral_completo$area_total)] <- 0
 
 # Crear el gráfico combinado
-combined_barplot_vega_matorral <- ggplot(combined_data_vega_matorral, aes(x = decile, y = area_total, fill = as.factor(year))) +
+combined_barplot_vega_matorral_completo <- ggplot(combined_data_vega_matorral_completo, aes(x = decile, y = area_total, fill = as.factor(year))) +
   geom_bar(stat = "identity", position = "dodge") +
   scale_fill_manual(values = c("2023" = "red", "2024" = "cyan")) +
   labs(title = "Categorías de NDVI para Vega - matorral",
@@ -247,10 +261,10 @@ combined_barplot_vega_matorral <- ggplot(combined_data_vega_matorral, aes(x = de
   theme_minimal()
 
 # Mostrar el gráfico
-print(combined_barplot_vega_matorral)
+print(combined_barplot_vega_matorral_completo)
 
 #####################################################################################################################
-#Vega
+# Vega
 
 # Filtrar los datos para Tipo_linea = "Vega"
 shp_vega <- shp[shp$Tipo_linea == "Vega", ]
@@ -271,11 +285,14 @@ area_por_decil_2024_vega <- shp_vega %>%
 # Combinar los datos en un solo dataframe
 combined_data_vega <- rbind(area_por_decil_2023_vega, area_por_decil_2024_vega)
 
-# Convertir los deciles a factor para el gráfico
-combined_data_vega$decile <- as.factor(combined_data_vega$decile)
+# Unir los datos combinados con el dataframe de todos los deciles para asegurarse de que todos los deciles estén presentes
+combined_data_vega_completo <- merge(todos_los_deciles, combined_data_vega, by = "decile", all.x = TRUE)
+
+# Convertir los valores NA en 0 para el área total
+combined_data_vega_completo$area_total[is.na(combined_data_vega_completo$area_total)] <- 0
 
 # Crear el gráfico combinado
-combined_barplot_vega <- ggplot(combined_data_vega, aes(x = decile, y = area_total, fill = as.factor(year))) +
+combined_barplot_vega_completo <- ggplot(combined_data_vega_completo, aes(x = decile, y = area_total, fill = as.factor(year))) +
   geom_bar(stat = "identity", position = "dodge") +
   scale_fill_manual(values = c("2023" = "red", "2024" = "cyan")) +
   labs(title = "Categorías de NDVI para Vega",
@@ -285,10 +302,10 @@ combined_barplot_vega <- ggplot(combined_data_vega, aes(x = decile, y = area_tot
   theme_minimal()
 
 # Mostrar el gráfico
-print(combined_barplot_vega)
+print(combined_barplot_vega_completo)
 
 #####################################################################################################################
-#Pradera
+# Pradera
 
 # Filtrar los datos para Tipo_linea = "Pradera"
 shp_pradera <- shp[shp$Tipo_linea == "Pradera", ]
@@ -309,11 +326,14 @@ area_por_decil_2024_pradera <- shp_pradera %>%
 # Combinar los datos en un solo dataframe
 combined_data_pradera <- rbind(area_por_decil_2023_pradera, area_por_decil_2024_pradera)
 
-# Convertir los deciles a factor para el gráfico
-combined_data_pradera$decile <- as.factor(combined_data_pradera$decile)
+# Unir los datos combinados con el dataframe de todos los deciles para asegurarse de que todos los deciles estén presentes
+combined_data_pradera_completo <- merge(todos_los_deciles, combined_data_pradera, by = "decile", all.x = TRUE)
+
+# Convertir los valores NA en 0 para el área total
+combined_data_pradera_completo$area_total[is.na(combined_data_pradera_completo$area_total)] <- 0
 
 # Crear el gráfico combinado
-combined_barplot_pradera <- ggplot(combined_data_pradera, aes(x = decile, y = area_total, fill = as.factor(year))) +
+combined_barplot_pradera_completo <- ggplot(combined_data_pradera_completo, aes(x = decile, y = area_total, fill = as.factor(year))) +
   geom_bar(stat = "identity", position = "dodge") +
   scale_fill_manual(values = c("2023" = "red", "2024" = "cyan")) +
   labs(title = "Categorías de NDVI para Pradera",
@@ -323,4 +343,83 @@ combined_barplot_pradera <- ggplot(combined_data_pradera, aes(x = decile, y = ar
   theme_minimal()
 
 # Mostrar el gráfico
-print(combined_barplot_pradera)
+print(combined_barplot_pradera_completo)
+
+#####################################################################################################################
+# Áreas sin vegetación
+
+# Filtrar los datos para Tipo_linea = "Áreas sin vegetación"
+shp_areas_sin_vegetacion <- shp[shp$Tipo_linea == "Áreas sin vegetación", ]
+
+# Calcular el área total por decil para z2023 y z2024 para Tipo_linea = "Áreas sin vegetación"
+area_por_decil_2023_areas_sin_vegetacion <- shp_areas_sin_vegetacion %>%
+  group_by(decile_z2023) %>%
+  summarise(area_total = sum(AREA, na.rm = TRUE)) %>%
+  mutate(year = 2023, decile = decile_z2023) %>%
+  select(decile, area_total, year)
+
+area_por_decil_2024_areas_sin_vegetacion <- shp_areas_sin_vegetacion %>%
+  group_by(decile_z2024) %>%
+  summarise(area_total = sum(AREA, na.rm = TRUE)) %>%
+  mutate(year = 2024, decile = decile_z2024) %>%
+  select(decile, area_total, year)
+
+# Combinar los datos en un solo dataframe
+combined_data_areas_sin_vegetacion <- rbind(area_por_decil_2023_areas_sin_vegetacion, area_por_decil_2024_areas_sin_vegetacion)
+
+# Unir los datos combinados con el dataframe de todos los deciles para asegurarse de que todos los deciles estén presentes
+combined_data_areas_sin_vegetacion_completo <- merge(todos_los_deciles, combined_data_areas_sin_vegetacion, by = "decile", all.x = TRUE)
+
+# Convertir los valores NA en 0 para el área total
+combined_data_areas_sin_vegetacion_completo$area_total[is.na(combined_data_areas_sin_vegetacion_completo$area_total)] <- 0
+
+# Crear el gráfico combinado
+combined_barplot_areas_sin_vegetacion_completo <- ggplot(combined_data_areas_sin_vegetacion_completo, aes(x = decile, y = area_total, fill = as.factor(year))) +
+  geom_bar(stat = "identity", position = "dodge") +
+  scale_fill_manual(values = c("2023" = "red", "2024" = "cyan")) +
+  labs(title = "Categorías de NDVI para Áreas sin vegetación",
+       x = "Categoría de NDVI",
+       y = "Área (Ha)",
+       fill = "Año") +
+  theme_minimal()
+
+# Mostrar el gráfico
+print(combined_barplot_areas_sin_vegetacion_completo)
+
+#####################################################################################################################
+# ANÁLISIS DE WASSERSTEIN
+
+# Calcular la distancia de Wasserstein para la totalidad del área de estudio
+calcular_distancia_wasserstein <- function(data, decile_column_2023, decile_column_2024) {
+  deciles_2023 <- as.numeric(as.character(na.omit(data[[decile_column_2023]])))
+  deciles_2024 <- as.numeric(as.character(na.omit(data[[decile_column_2024]])))
+  
+  if (length(deciles_2023) == 0 || length(deciles_2024) == 0) {
+    return(NA)  # Si alguna de las distribuciones está vacía, devuelve NA
+  }
+  
+  dist <- wasserstein1d(deciles_2023, deciles_2024)
+  return(dist)
+}
+
+# Calcular la distancia de Wasserstein para la totalidad del área de estudio
+distancia_wasserstein_total <- calcular_distancia_wasserstein(shp, "decile_z2023", "decile_z2024")
+
+# Calcular la distancia de Wasserstein para cada clase de Tipo_linea
+distancia_wasserstein_matorral_vega <- calcular_distancia_wasserstein(shp[shp$Tipo_linea == "Matorral - vega", ], "decile_z2023", "decile_z2024")
+distancia_wasserstein_vega_cojin_matorral <- calcular_distancia_wasserstein(shp[shp$Tipo_linea == "Vega en cojín - matorral", ], "decile_z2023", "decile_z2024")
+distancia_wasserstein_vega_cojin <- calcular_distancia_wasserstein(shp[shp$Tipo_linea == "Vega en cojín", ], "decile_z2023", "decile_z2024")
+distancia_wasserstein_vega_matorral <- calcular_distancia_wasserstein(shp[shp$Tipo_linea == "Vega - matorral", ], "decile_z2023", "decile_z2024")
+distancia_wasserstein_vega <- calcular_distancia_wasserstein(shp[shp$Tipo_linea == "Vega", ], "decile_z2023", "decile_z2024")
+distancia_wasserstein_pradera <- calcular_distancia_wasserstein(shp[shp$Tipo_linea == "Pradera", ], "decile_z2023", "decile_z2024")
+distancia_wasserstein_areas_sin_vegetacion <- calcular_distancia_wasserstein(shp[shp$Tipo_linea == "Áreas sin vegetación", ], "decile_z2023", "decile_z2024")
+
+# Mostrar los resultados
+print(paste("Distancia de Wasserstein (total):", distancia_wasserstein_total))
+print(paste("Distancia de Wasserstein (Matorral - vega):", distancia_wasserstein_matorral_vega))
+print(paste("Distancia de Wasserstein (Vega en cojín - matorral):", distancia_wasserstein_vega_cojin_matorral))
+print(paste("Distancia de Wasserstein (Vega en cojín):", distancia_wasserstein_vega_cojin))
+print(paste("Distancia de Wasserstein (Vega - matorral):", distancia_wasserstein_vega_matorral))
+print(paste("Distancia de Wasserstein (Vega):", distancia_wasserstein_vega))
+print(paste("Distancia de Wasserstein (Pradera):", distancia_wasserstein_pradera))
+print(paste("Distancia de Wasserstein (Áreas sin vegetación):", distancia_wasserstein_areas_sin_vegetacion))
