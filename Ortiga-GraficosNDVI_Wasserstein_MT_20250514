@@ -1,0 +1,201 @@
+# Carga las librerías
+library(sf)
+library(ggplot2)
+library(gridExtra)
+library(classInt)
+library(FNN)
+library(philentropy)
+library(dplyr)
+library(Rcpp)
+library(transport)
+
+# Leer shapefile
+shapefile_path <- "D:/_1341-ANGLO-RecuperacionEsteroOrtigas/CAPAS/Vegetación/Mayo_2025/UnidadesVEgetaciónOrtiga_Actualizacion_Mayo_20250509_Zonal.shp"
+shp <- st_read(shapefile_path)
+
+# Convertir columnas a numérico
+shp$z2023 <- as.numeric(shp$z2023)
+shp$z2024 <- as.numeric(shp$z2024)
+shp$z2025 <- as.numeric(shp$z2025)
+shp$sdz2024 <- as.numeric(shp$sdz2024)
+shp$AREA <- as.numeric(shp$AREA)
+shp <- shp[shp$AREA != 0, ]
+
+# Filtrar NAs
+shp <- shp[!is.na(shp$z2023) & !is.na(shp$z2024) & !is.na(shp$z2025) & !is.na(shp$sdz2024) & !is.na(shp$AREA), ]
+
+# Excluir cuerpos de agua
+shp_no_water <- shp[shp$Tipo_Veg != "Cuerpo de agua", ]
+
+# Percentiles y breaks para 10 deciles
+percentiles_2023 <- quantile(shp_no_water$z2023, probs = seq(0, 1, 0.1), na.rm = TRUE)
+percentiles_2024 <- quantile(shp_no_water$z2024, probs = seq(0, 1, 0.1), na.rm = TRUE)
+percentiles_2025 <- quantile(shp_no_water$z2025, probs = seq(0, 1, 0.1), na.rm = TRUE)
+
+breaks_2023 <- percentiles_2023
+breaks_2024 <- percentiles_2024
+breaks_2025 <- percentiles_2025
+
+# Categorización en deciles
+shp_no_water$decile_z2023 <- cut(shp_no_water$z2023, breaks = breaks_2023, labels = 1:10, include.lowest = TRUE)
+shp_no_water$decile_z2024 <- cut(shp_no_water$z2024, breaks = breaks_2024, labels = 1:10, include.lowest = TRUE)
+shp_no_water$decile_z2025 <- cut(shp_no_water$z2025, breaks = breaks_2025, labels = 1:10, include.lowest = TRUE)
+
+shp$decile_z2023 <- NA
+shp$decile_z2024 <- NA
+shp$decile_z2025 <- NA
+
+shp$decile_z2023[shp$Tipo_Veg != "Cuerpo de agua"] <- shp_no_water$decile_z2023
+shp$decile_z2024[shp$Tipo_Veg != "Cuerpo de agua"] <- shp_no_water$decile_z2024
+shp$decile_z2025[shp$Tipo_Veg != "Cuerpo de agua"] <- shp_no_water$decile_z2025
+
+# Exportar shapefile reducido
+shp_reducido <- shp[, c("ID_unico", "z2023", "decile_z2023", "z2024", "decile_z2024", "z2025", "decile_z2025", "Tipo_Veg", "geometry")]
+output_path <- "D:/_1341-ANGLO-RecuperacionEsteroOrtigas/CAPAS/Vegetación/Mayo_2025/UnidadesVEgetaciónOrtiga_Actualizacion_Mayo_20250509_Zonal_Red.shp"
+st_write(shp_reducido, output_path, delete_dsn = TRUE)
+
+if (!dir.exists("graficos")) dir.create("graficos")
+
+# Gráficos
+categorias <- c("Matorral - vega", "Vega en cojín - matorral", "Vega en cojín", "Vega - matorral", "Vega", "Pradera", "Áreas sin vegetación")
+
+graficar_area_por_decil_categoria <- function(datos, categoria) {
+  datos_cat <- datos[datos$Tipo_Veg == categoria, ]
+  area_2023 <- datos_cat %>% group_by(decile_z2023) %>% summarise(area = sum(AREA), .groups = "drop") %>% mutate(year = 2023, decile = as.character(decile_z2023))
+  area_2024 <- datos_cat %>% group_by(decile_z2024) %>% summarise(area = sum(AREA), .groups = "drop") %>% mutate(year = 2024, decile = as.character(decile_z2024))
+  area_2025 <- datos_cat %>% group_by(decile_z2025) %>% summarise(area = sum(AREA), .groups = "drop") %>% mutate(year = 2025, decile = as.character(decile_z2025))
+  combinado <- bind_rows(area_2023, area_2024, area_2025)
+  base_completa <- expand.grid(decile = as.character(1:10), year = c(2023, 2024, 2025))
+  datos_completos <- merge(base_completa, combinado, by = c("decile", "year"), all.x = TRUE)
+  datos_completos$area[is.na(datos_completos$area)] <- 0
+  datos_completos <- datos_completos %>% group_by(year) %>% mutate(prop = area / sum(area)) %>% ungroup()
+  p <- ggplot(datos_completos, aes(x = decile, y = factor(year), fill = prop)) +
+    geom_tile(color = "white") +
+    geom_text(aes(label = sprintf("%.1f%%", prop * 100)), size = 3, color = "black", angle = 90, hjust = 1) +
+    scale_fill_gradient(low = "white", high = "darkgreen", name = "% del área") +
+    labs(title = paste("Distribución relativa de NDVI por deciles:", categoria), x = "Decil NDVI", y = "Año") +
+    theme_minimal() +
+    theme(panel.grid = element_blank())
+  print(p)
+  ggsave(filename = paste0("graficos/", gsub("[^[:alnum:]_]+", "_", categoria), "_ndvi_heatmap_pct.png"), plot = p, width = 8, height = 5)
+}
+lapply(categorias, function(cat) graficar_area_por_decil_categoria(shp, cat))
+
+#### GRAFICO NDVI PARA EL TOTAL DEL ÁREA SIN CUERPOS DE AGUA
+
+graficar_ndvi_total_area <- function(shp_filtrado) {
+  # Agrupar y calcular área por decil y año
+  area_2023 <- shp_filtrado %>%
+    group_by(decile_z2023) %>%
+    summarise(area = sum(AREA), .groups = "drop") %>%
+    mutate(year = 2023, decile = as.character(decile_z2023))
+  
+  area_2024 <- shp_filtrado %>%
+    group_by(decile_z2024) %>%
+    summarise(area = sum(AREA), .groups = "drop") %>%
+    mutate(year = 2024, decile = as.character(decile_z2024))
+  
+  area_2025 <- shp_filtrado %>%
+    group_by(decile_z2025) %>%
+    summarise(area = sum(AREA), .groups = "drop") %>%
+    mutate(year = 2025, decile = as.character(decile_z2025))
+  
+  # Unir los años
+  combinado_total <- bind_rows(area_2023, area_2024, area_2025)
+  
+  # Crear base completa para asegurar que estén todos los deciles
+  base_completa_total <- expand.grid(
+    decile = as.character(1:10),
+    year = c(2023, 2024, 2025)
+  )
+  
+  datos_completos_total <- merge(base_completa_total, combinado_total,
+                                 by = c("decile", "year"), all.x = TRUE)
+  datos_completos_total$area[is.na(datos_completos_total$area)] <- 0
+  
+  # Calcular proporciones
+  datos_completos_total <- datos_completos_total %>%
+    group_by(year) %>%
+    mutate(prop = area / sum(area)) %>%
+    ungroup()
+  
+  # Crear gráfico
+  p_total <- ggplot(datos_completos_total, aes(x = decile, y = factor(year), fill = prop)) +
+    geom_tile(color = "white") +
+    geom_text(aes(label = sprintf("%.1f%%", prop * 100)),
+              size = 3, color = "black", angle = 90, hjust = 1) +
+    scale_fill_gradient(low = "white", high = "darkgreen", name = "% del área") +
+    labs(title = "Distribución relativa de NDVI por deciles (sin cuerpos de agua)",
+         x = "Decil NDVI", y = "Año") +
+    theme_minimal() +
+    theme(panel.grid = element_blank())
+}
+
+print (p_total)
+
+
+# Análisis Wasserstein por NDVI estricto
+
+calcular_distancia_wasserstein_ndvi <- function(data, col_a, col_b) {
+  a <- as.numeric(data[[col_a]])
+  b <- as.numeric(data[[col_b]])
+  a <- a[!is.na(a) & a >= -1 & a <= 1]
+  b <- b[!is.na(b) & b >= -1 & b <= 1]
+  if (length(a) == 0 || length(b) == 0) return(NA)
+  return(wasserstein1d(a, b))
+}
+
+distancia_wasserstein_total_2023_2024 <- calcular_distancia_wasserstein_ndvi(shp_no_water, "z2023", "z2024")
+distancia_wasserstein_total_2024_2025 <- calcular_distancia_wasserstein_ndvi(shp_no_water, "z2024", "z2025")
+
+resultados_wasserstein <- list()
+wass_df <- data.frame()
+
+for (cat in categorias) {
+  datos_cat <- shp_no_water[shp_no_water$Tipo_Veg == cat, ]
+  d1 <- calcular_distancia_wasserstein_ndvi(datos_cat, "z2023", "z2024")
+  d2 <- calcular_distancia_wasserstein_ndvi(datos_cat, "z2024", "z2025")
+  resultados_wasserstein[[cat]] <- list("2023_vs_2024" = d1, "2024_vs_2025" = d2)
+  wass_df <- rbind(wass_df, data.frame(Categoria = cat, Comparacion = c("2023 vs 2024", "2024 vs 2025"), Distancia = c(d1, d2)))
+}
+
+p_wasserstein <- ggplot(wass_df, aes(x = Categoria, y = Distancia, fill = Comparacion)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(title = "Distancia de Wasserstein por categoría de vegetación", x = "Categoría de vegetación", y = "Distancia de Wasserstein", fill = "Comparación") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+print(p_wasserstein)
+
+# === Wasserstein POR DECILES ===
+calcular_distancia_wasserstein_deciles <- function(data, col_a, col_b) {
+  a <- as.numeric(as.character(data[[col_a]]))
+  b <- as.numeric(as.character(data[[col_b]]))
+  a <- a[!is.na(a)]
+  b <- b[!is.na(b)]
+  if (length(a) == 0 || length(b) == 0) return(NA)
+  return(wasserstein1d(a, b))
+}
+
+distancia_wasserstein_decile_total_2023_2024 <- calcular_distancia_wasserstein_deciles(shp_no_water, "decile_z2023", "decile_z2024")
+distancia_wasserstein_decile_total_2024_2025 <- calcular_distancia_wasserstein_deciles(shp_no_water, "decile_z2024", "decile_z2025")
+
+resultados_wasserstein_decile <- list()
+wass_df_decile <- data.frame()
+
+for (cat in categorias) {
+  datos_cat <- shp_no_water[shp_no_water$Tipo_Veg == cat, ]
+  d1 <- calcular_distancia_wasserstein_deciles(datos_cat, "decile_z2023", "decile_z2024")
+  d2 <- calcular_distancia_wasserstein_deciles(datos_cat, "decile_z2024", "decile_z2025")
+  resultados_wasserstein_decile[[cat]] <- list("2023_vs_2024" = d1, "2024_vs_2025" = d2)
+  wass_df_decile <- rbind(wass_df_decile, data.frame(Categoria = cat, Comparacion = c("2023 vs 2024", "2024 vs 2025"), Distancia = c(d1, d2)))
+}
+
+p_wass_decile <- ggplot(wass_df_decile, aes(x = Categoria, y = Distancia, fill = Comparacion)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(title = "Distancia de Wasserstein por categoría de vegetación (Deciles)", x = "Categoría de vegetación", y = "Distancia de Wasserstein", fill = "Comparación") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+print(p_wass_decile)
+
