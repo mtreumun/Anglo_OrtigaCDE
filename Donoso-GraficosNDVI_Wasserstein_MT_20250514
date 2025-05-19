@@ -1,0 +1,615 @@
+###################################################################################################
+#CODIGO DESARROLLADO POR MATÍAS TREUMUN - MAYO 2024
+
+library(sf)
+library(ggplot2)
+library(dplyr)
+library(transport)
+
+# Lee NDVI Donoso 2023
+donoso_2023 <- "E:/ANGLO_Ortiga CDE/CAPAS/20240507_2023.shp"
+donoso_2023_sf <- st_read(donoso_2023)
+unique_ids_2023 <- unique(donoso_2023_sf$ID_Poly_po)
+
+# Lee NDVI Donoso 2024
+donoso_2024 <- "E:/ANGLO_Ortiga CDE/CAPAS/20240507_2024.shp"
+donoso_2024_sf <- st_read(donoso_2024)
+unique_ids_2024 <- unique(donoso_2024_sf$ID_Poly_po)
+
+# Definir el área de cada píxel en m2
+area_per_pixel_2023 <- 0.000261986596
+area_per_pixel_2024 <- 0.000277569761180625
+
+#Genera histogramas 2023
+for (id in unique_ids_2023) {
+  subset_data <- donoso_2023_sf[donoso_2023_sf$ID_Poly_po == id, ]
+  subset_data <- subset_data[subset_data$Mean_ndvi_ >= -1 & subset_data$Mean_ndvi_ <= 1, ]
+  
+  if (nrow(subset_data) > 0) {
+    p <- ggplot(subset_data, aes(x = Mean_ndvi_)) +
+      geom_histogram(aes(y = ..count.. * area_per_pixel_2023), bins = 10, fill = "blue", color = "black") +
+      ggtitle(paste("Histogram of Mean_ndvi_ for ID_Poly_po:", id)) +
+      xlab("Mean_ndvi_") +
+      ylab("Area (m2)") +
+      xlim(-1, 1)
+    print(p)
+  } else {
+    print(paste("No valid data available for ID_Poly_po:", id))
+  }
+}
+
+#Genera histogramas 2024
+for (id in unique_ids_2024) {
+  subset_data <- donoso_2024_sf[donoso_2024_sf$ID_Poly_po == id, ]
+  subset_data <- subset_data[subset_data$Mean_ndvi_ >= -1 & subset_data$Mean_ndvi_ <= 1, ]
+  
+  if (nrow(subset_data) > 0) {
+    p <- ggplot(subset_data, aes(x = Mean_ndvi_)) +
+      geom_histogram(aes(y = ..count.. * area_per_pixel_2024), bins = 10, fill = "blue", color = "black") +
+      ggtitle(paste("Histogram of Mean_ndvi_ for ID_Poly_po:", id, " (2024)")) +
+      xlab("Mean_ndvi_") +
+      ylab("Area (m2)") +
+      xlim(-1, 1)
+    print(p)
+  } else {
+    print(paste("No valid data available for ID_Poly_po:", id))
+  }
+}
+
+#############################################################################
+#CALCULO DE CUANTILES PARA CADA ID_poly_Po
+# Calcular los cuantiles
+percentiles_2023 <- quantile(donoso_2023_sf$Mean_ndvi_, probs = c(0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9,1), na.rm = TRUE)
+percentiles_2024 <- quantile(donoso_2024_sf$Mean_ndvi_, probs = c(0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9,1), na.rm = TRUE)
+
+# Añadir -Inf y Inf para cubrir todos los posibles valores de NDVI
+breaks_2023 <- c(-Inf, percentiles_2023, Inf)
+breaks_2024 <- c(-Inf, percentiles_2024, Inf)
+
+# Asignar categorías según los cuantiles
+labels_2023 <- cut(donoso_2023_sf$Mean_ndvi_, breaks = breaks_2023, labels = c(1,2,3,4,5,6,7,8,9,10,11))
+labels_2024 <- cut(donoso_2024_sf$Mean_ndvi_, breaks = breaks_2024, labels = c(1,2,3,4,5,6,7,8,9,10,11))
+
+# Agregar las nuevas categorías a los dataframes
+donoso_2023_sf$NDVI_Category <- labels_2023
+donoso_2024_sf$NDVI_Category <- labels_2024
+
+# Opcional: Mostrar una tabla con las primeras filas de los datos categorizados
+head(donoso_2023_sf[c("Mean_ndvi_", "NDVI_Category")])
+head(donoso_2024_sf[c("Mean_ndvi_", "NDVI_Category")])
+
+unique_ids <- unique(c(donoso_2023_sf$ID_Poly_po, donoso_2024_sf$ID_Poly_po))
+
+# Iniciar un data frame para almacenar todos los resultados combinados
+all_combined_frequencies <- data.frame()
+
+# Crear un dataframe completo con todos los deciles del 1 al 10
+todos_los_deciles <- data.frame(NDVI_Category = as.factor(1:10))
+
+# Iterar sobre cada ID_Poly_po
+for (id in unique_ids) {
+  # Filtrar para cada ID_Poly_po para ambos años
+  filtered_2023_sf <- donoso_2023_sf %>% 
+    filter(ID_Poly_po == id) %>%
+    st_drop_geometry()  # Eliminar geometría para operaciones no espaciales
+  
+  filtered_2024_sf <- donoso_2024_sf %>% 
+    filter(ID_Poly_po == id) %>%
+    st_drop_geometry()  # Eliminar geometría para operaciones no espaciales
+  
+  # Calcular las frecuencias para 2023
+  frequencies_2023 <- filtered_2023_sf %>%
+    group_by(NDVI_Category) %>%
+    summarise(Frequency_2023 = n(), .groups = 'drop')
+  
+  # Calcular las frecuencias para 2024
+  frequencies_2024 <- filtered_2024_sf %>%
+    group_by(NDVI_Category) %>%
+    summarise(Frequency_2024 = n(), .groups = 'drop')
+  
+  # Asegurarse de incluir todos los deciles
+  frequencies_2023 <- left_join(todos_los_deciles, frequencies_2023, by = "NDVI_Category")
+  frequencies_2024 <- left_join(todos_los_deciles, frequencies_2024, by = "NDVI_Category")
+  
+  # Combinar las tablas de frecuencias de 2023 y 2024
+  combined_frequencies <- full_join(frequencies_2023, frequencies_2024, by = "NDVI_Category")
+  combined_frequencies$ID_Poly_po <- id  # Añadir el ID para referencia
+  
+  # Acumular los resultados en el data frame general
+  all_combined_frequencies <- rbind(all_combined_frequencies, combined_frequencies)
+}
+
+# Ordenar el resultado final por `ID_Poly_po` y `NDVI_Category`
+final_table <- all_combined_frequencies %>%
+  arrange(ID_Poly_po, NDVI_Category)
+
+# Imprimir el resultado final
+print(final_table)
+
+# Especificar la ruta y el nombre del archivo
+output_path <- "E:/ANGLO_Ortiga CDE/BD/ID_Poly_frequenciesNDVI_MT_20240513_v1.csv"
+
+# Exportar final_table a un archivo CSV
+write.csv(final_table, output_path, row.names = FALSE)
+
+###########################################################################
+#GRAFICOS DE FRECUENCIAS PARA LOS 13 POLYS
+
+# Crear gráficos de frecuencias para los 13 polígonos usando áreas en m2
+combined_data <- rbind(donoso_2023_sf %>% mutate(Year = "2023"), donoso_2024_sf %>% mutate(Year = "2024"))
+
+# Crear una lista para almacenar gráficos
+plot_list <- list()
+
+for (id in 1:13) {
+  filtered_data <- combined_data %>%
+    filter(ID_Poly_po == id, !is.na(NDVI_Category))
+  
+  plot_data <- filtered_data %>%
+    group_by(NDVI_Category, Year) %>%
+    summarise(Count = n(), .groups = 'drop') %>%
+    mutate(Area = ifelse(Year == "2023", Count * area_per_pixel_2023, Count * area_per_pixel_2024))
+  
+  p <- ggplot(plot_data, aes(x = NDVI_Category, y = Area, fill = Year)) +
+    geom_bar(stat = "identity", position = position_dodge(0.8), color = "black") +
+    geom_vline(xintercept = 5.5, linetype = "dashed", color = "red", size = 1) +
+    annotate("text", x = 5.5, y = max(plot_data$Area), label = "Límite estimado de la actividad fotosintética", 
+             angle = 90, vjust = -0.5, hjust = 1, color = "red") +
+    scale_y_continuous(labels = function(x) format(x, big.mark = ".", decimal.mark = ",")) +
+    labs(title = paste("Categorías de NDVI para la Unidad n°", id),
+         x = "Categoría de NDVI",
+         y = "Área (m2)",
+         fill = "Año") +
+    theme_minimal()
+  
+  plot_list[[id]] <- p
+}
+
+for (plot in plot_list) {
+  print(plot)
+}
+
+#########################################################################################################
+#TRABAJO CON AGRUPACIONES PROPUESTAS ME SUBTIPOS DE VEGETACION
+
+# Definir los grupos
+groups <- list(
+  group1 = c(5, 7),
+  group2 = c(6, 8, 9, 10, 11, 12, 13),
+  group3 = c(1, 2, 3, 4)
+)
+
+
+# Asignar los grupos según ID_Poly_po
+donoso_2023_sf <- donoso_2023_sf %>%
+  mutate(Group = case_when(
+    ID_Poly_po %in% groups$group1 ~ "group1",
+    ID_Poly_po %in% groups$group2 ~ "group2",
+    ID_Poly_po %in% groups$group3 ~ "group3",
+    TRUE ~ "other"  # Para cualquier ID que no esté listado en los grupos
+  ))
+
+donoso_2024_sf <- donoso_2024_sf %>%
+  mutate(Group = case_when(
+    ID_Poly_po %in% groups$group1 ~ "group1",
+    ID_Poly_po %in% groups$group2 ~ "group2",
+    ID_Poly_po %in% groups$group3 ~ "group3",
+    TRUE ~ "other"  # Para cualquier ID que no esté listado en los grupos
+  ))
+
+# Opcional: Mostrar una tabla con las primeras filas de los datos con los grupos asignados
+head(donoso_2023_sf[c("ID_Poly_po", "NDVI_Category", "Group")])
+head(donoso_2024_sf[c("ID_Poly_po", "NDVI_Category", "Group")])
+
+# Iniciar un data frame para almacenar todos los resultados combinados
+all_combined_frequencies <- data.frame()
+
+# Iterar sobre cada grupo definido
+for (group in c("group1", "group2", "group3")) {
+  # Filtrar para cada grupo para ambos años
+  group_data_2023 <- donoso_2023_sf %>%
+    filter(Group == group) %>%
+    st_drop_geometry()  # Eliminar geometría para operaciones no espaciales
+  
+  group_data_2024 <- donoso_2024_sf %>%
+    filter(Group == group) %>%
+    st_drop_geometry()  # Eliminar geometría para operaciones no espaciales
+  
+  # Calcular los percentiles para cada grupo
+  percentiles_2023 <- quantile(group_data_2023$Mean_ndvi_, probs = c(0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1), na.rm = TRUE)
+  print(paste("Percentiles 2023 for Group", group, ":", percentiles_2023))
+  
+  # Calcular las frecuencias para 2023
+  frequencies_2023 <- group_data_2023 %>%
+    group_by(NDVI_Category) %>%
+    summarise(Frequency_2023 = n(), .groups = 'drop')
+  
+  # Calcular las frecuencias para 2024
+  frequencies_2024 <- group_data_2024 %>%
+    group_by(NDVI_Category) %>%
+    summarise(Frequency_2024 = n(), .groups = 'drop')
+  
+  # Combinar las tablas de frecuencias de 2023 y 2024
+  combined_frequencies <- full_join(frequencies_2023, frequencies_2024, by = "NDVI_Category")
+  combined_frequencies$Group <- group  # Añadir el grupo para referencia
+  
+  # Acumular los resultados en el data frame general
+  all_combined_frequencies <- rbind(all_combined_frequencies, combined_frequencies)
+}
+
+# Ordenar el resultado final por `Group` y `NDVI_Category`
+final_table <- all_combined_frequencies %>%
+  arrange(Group, NDVI_Category)
+
+# Imprimir el resultado final
+print(final_table)
+
+# Especificar la ruta y el nombre del archivo
+output_path <- "E:/ANGLO_Ortiga CDE/BD/Group_frequenciesNDVI_MT_20240513_v1.csv"
+
+##############################################################################################################
+#GRAFICOS DE AGRUPACIONES PROPUESTAS ME SUBTIPOS DE VEGETACION
+
+#Subtipo Carex macloviana
+combined_data_group1 <- rbind(
+  donoso_2023_sf %>% filter(Group == "group1") %>% mutate(Year = "2023"),
+  donoso_2024_sf %>% filter(Group == "group1") %>% mutate(Year = "2024")
+)
+
+filtered_data <- combined_data_group1 %>%
+  filter(!is.na(NDVI_Category))
+
+plot_data <- filtered_data %>%
+  group_by(NDVI_Category, Year) %>%
+  summarise(Count = n(), .groups = 'drop') %>%
+  mutate(Area = ifelse(Year == "2023", Count * area_per_pixel_2023, Count * area_per_pixel_2024))
+
+p <- ggplot(plot_data, aes(x = NDVI_Category, y = Area, fill = Year)) +
+  geom_bar(stat = "identity", position = position_dodge(0.8), color = "black") +
+  geom_vline(xintercept = 5.5, linetype = "dashed", color = "red", size = 1) +
+  annotate("text", x = 5.5, y = max(plot_data$Area, na.rm = TRUE), label = "Límite estimado de la actividad fotosintética", 
+           angle = 90, vjust = -0.5, hjust = 1, color = "red") +
+  scale_y_continuous(labels = function(x) format(x, big.mark = ".", decimal.mark = ",")) +
+  labs(title = "Subtipo Vega de Carex macloviana",
+       x = "Categoría de NDVI",
+       y = "Área (m2)",
+       fill = "Año") +
+  theme_minimal()
+
+print(p)
+
+# Subtipo Vega de Patosia clandestina y Carex macloviana
+combined_data_group2 <- rbind(
+  donoso_2023_sf %>% filter(Group == "group2") %>% mutate(Year = "2023"),
+  donoso_2024_sf %>% filter(Group == "group2") %>% mutate(Year = "2024")
+)
+
+filtered_data <- combined_data_group2 %>%
+  filter(!is.na(NDVI_Category))
+
+plot_data <- filtered_data %>%
+  group_by(NDVI_Category, Year) %>%
+  summarise(Count = n(), .groups = 'drop') %>%
+  mutate(Area = ifelse(Year == "2023", Count * area_per_pixel_2023, Count * area_per_pixel_2024))
+
+p <- ggplot(plot_data, aes(x = NDVI_Category, y = Area, fill = Year)) +
+  geom_bar(stat = "identity", position = position_dodge(0.8), color = "black") +
+  geom_vline(xintercept = 5.5, linetype = "dashed", color = "red", size = 1) +
+  annotate("text", x = 5.5, y = max(plot_data$Area, na.rm = TRUE), label = "Límite estimado de la actividad fotosintética", 
+           angle = 90, vjust = -0.5, hjust = 1, color = "red") +
+  scale_y_continuous(labels = function(x) format(x, big.mark = ".", decimal.mark = ",")) +
+  labs(title = "Subtipo Vega de Patosia clandestina y Carex macloviana",
+       x = "Categoría de NDVI",
+       y = "Área (m2)",
+       fill = "Año") +
+  theme_minimal()
+
+print(p)
+
+# Subtipo Vega de Patosia clandestina y Zameioscirpus gaimardioides
+combined_data_group3 <- rbind(
+  donoso_2023_sf %>% filter(Group == "group3") %>% mutate(Year = "2023"),
+  donoso_2024_sf %>% filter(Group == "group3") %>% mutate(Year = "2024")
+)
+
+filtered_data <- combined_data_group3 %>%
+  filter(!is.na(NDVI_Category))
+
+plot_data <- filtered_data %>%
+  group_by(NDVI_Category, Year) %>%
+  summarise(Count = n(), .groups = 'drop') %>%
+  mutate(Area = ifelse(Year == "2023", Count * area_per_pixel_2023, Count * area_per_pixel_2024))
+
+p <- ggplot(plot_data, aes(x = NDVI_Category, y = Area, fill = Year)) +
+  geom_bar(stat = "identity", position = position_dodge(0.8), color = "black") +
+  geom_vline(xintercept = 5.5, linetype = "dashed", color = "red", size = 1) +
+  annotate("text", x = 5.5, y = max(plot_data$Area, na.rm = TRUE), label = "Límite estimado de la actividad fotosintética", 
+           angle = 90, vjust = -0.5, hjust = 1, color = "red") +
+  scale_y_continuous(labels = function(x) format(x, big.mark = ".", decimal.mark = ",")) +
+  labs(title = "Subtipo Vega de Patosia clandestina y Zameioscirpus gaimardioides",
+       x = "Categoría de NDVI",
+       y = "Área (m2)",
+       fill = "Año") +
+  theme_minimal()
+
+print(p)
+
+######################################################################
+#APLICACION DE WAISSERSTEIN DISTANCE PARA LOS 13 POLYS
+# Obtener los ID únicos de los polígonos
+unique_ids <- unique(c(donoso_2023_sf$ID_Poly_po, donoso_2024_sf$ID_Poly_po))
+
+# Iterar sobre cada ID_Poly_po
+for (id in unique_ids) {
+  # Filtrar los datos por ID_Poly_po
+  subset_data_2023 <- donoso_2023_sf[donoso_2023_sf$ID_Poly_po == id, ]
+  subset_data_2024 <- donoso_2024_sf[donoso_2024_sf$ID_Poly_po == id, ]
+  
+  # Asegurarse que los datos estén en el rango -1 a 1
+  subset_data_2023 <- subset_data_2023[subset_data_2023$Mean_ndvi_ >= -1 & subset_data_2023$Mean_ndvi_ <= 1, ]
+  subset_data_2024 <- subset_data_2024[subset_data_2024$Mean_ndvi_ >= -1 & subset_data_2024$Mean_ndvi_ <= 1, ]
+  
+  # Histogramas con un número fijo de bins y un rango específico
+  breaks <- seq(-1, 1, length.out = 11)  # Asegura 10 bins iguales
+  hist_2023 <- hist(subset_data_2023$Mean_ndvi_, plot = FALSE, breaks = breaks, right = FALSE)
+  hist_2024 <- hist(subset_data_2024$Mean_ndvi_, plot = FALSE, breaks = breaks, right = FALSE)
+  
+  # Normalizar los histogramas
+  total_mass_2023 <- sum(hist_2023$counts)
+  total_mass_2024 <- sum(hist_2024$counts)
+  normalized_hist_2023 <- hist_2023$counts / total_mass_2023
+  normalized_hist_2024 <- hist_2024$counts / total_mass_2024
+  
+  #print(paste("ID_Poly_po", id, ":"))
+  #print("Histogram 2023 Normalized:")
+  #print(normalized_hist_2023)
+  #print("Histogram 2024 Normalized:")
+  #print(normalized_hist_2024)
+  
+  
+  # Crear una matriz de costos asumiendo que los histogramas están igualmente espaciados
+  bin_count <- length(hist_2023$breaks) - 1
+  cost_matrix <- matrix(0, nrow = bin_count, ncol = bin_count)
+  for (i in 1:bin_count) {
+    for (j in 1:bin_count) {
+      cost_matrix[i, j] <- abs(i - j)  # Simple cost: distance between indices
+    }
+  }
+  
+  #print("Cost Matrix:")
+  #print(cost_matrix)
+  
+  # Calcular la distancia de Wasserstein
+  if (length(normalized_hist_2023) > 0 && length(normalized_hist_2024) > 0 && total_mass_2023 > 0 && total_mass_2024 > 0) {
+    wasserstein_distance <- wasserstein(normalized_hist_2023, normalized_hist_2024, costm = cost_matrix)
+    print(paste("Wasserstein distance for ID_Poly_po", id, ":", wasserstein_distance))
+  } else {
+    print(paste("Insufficient data for Wasserstein distance calculation for ID_Poly_po", id))
+  }
+}
+
+###########################################################################################
+#WAISSERSTEIN PARA LOS GRUPOS 1, 2 Y 3
+
+# Iterar sobre cada grupo
+for (group_name in names(groups)) {
+  # Filtrar los datos por grupo
+  subset_data_2023 <- donoso_2023_sf %>% filter(ID_Poly_po %in% groups[[group_name]])
+  subset_data_2024 <- donoso_2024_sf %>% filter(ID_Poly_po %in% groups[[group_name]])
+  
+  # Asegurarse que los datos estén en el rango -1 a 1
+  subset_data_2023 <- subset_data_2023[subset_data_2023$Mean_ndvi_ >= -1 & subset_data_2023$Mean_ndvi_ <= 1, ]
+  subset_data_2024 <- subset_data_2024[subset_data_2024$Mean_ndvi_ >= -1 & subset_data_2024$Mean_ndvi_ <= 1, ]
+  
+  # Histogramas con un número fijo de bins y un rango específico
+  breaks <- seq(-1, 1, length.out = 11)  # Asegura 10 bins iguales
+  hist_2023 <- hist(subset_data_2023$Mean_ndvi_, plot = FALSE, breaks = breaks, right = FALSE)
+  hist_2024 <- hist(subset_data_2024$Mean_ndvi_, plot = FALSE, breaks = breaks, right = FALSE)
+  
+  # Normalizar los histogramas
+  total_mass_2023 <- sum(hist_2023$counts)
+  total_mass_2024 <- sum(hist_2024$counts)
+  normalized_hist_2023 <- hist_2023$counts / total_mass_2023
+  normalized_hist_2024 <- hist_2024$counts / total_mass_2024
+  
+  # Crear una matriz de costos asumiendo que los histogramas están igualmente espaciados
+  bin_count <- length(hist_2023$breaks) - 1
+  cost_matrix <- matrix(0, nrow = bin_count, ncol = bin_count)
+  for (i in 1:bin_count) {
+    for (j in 1:bin_count) {
+      cost_matrix[i, j] <- abs(i - j)  # Simple cost: distance between indices
+    }
+  }
+  
+  # Calcular la distancia de Wasserstein
+  if (length(normalized_hist_2023) > 0 && length(normalized_hist_2024) > 0 && total_mass_2023 > 0 && total_mass_2024 > 0) {
+    wasserstein_distance <- wasserstein(normalized_hist_2023, normalized_hist_2024, costm = cost_matrix)
+    print(paste("Wasserstein distance for group", group_name, ":", wasserstein_distance))
+  } else {
+    print(paste("Insufficient data for Wasserstein distance calculation for group", group_name))
+  }
+}
+
+###########################################################################################
+#COMPARA WAISSERSTEIN ENTRE DISTINTOS GRUPOS
+
+# Iniciar un data frame para almacenar los resultados de Wasserstein
+wasserstein_results <- data.frame(Group1 = character(), Group2 = character(), Wasserstein_Distance = numeric())
+
+# Iterar sobre cada par de grupos definidos
+group_names <- names(groups)
+for (i in 1:(length(group_names) - 1)) {
+  for (j in (i + 1):length(group_names)) {
+    group1 <- group_names[i]
+    group2 <- group_names[j]
+    
+    # Filtrar para cada grupo en el año 2024
+    group_data_2024_group1 <- donoso_2024_sf %>%
+      filter(Group == group1) %>%
+      st_drop_geometry()  # Eliminar geometría para operaciones no espaciales
+    
+    group_data_2024_group2 <- donoso_2024_sf %>%
+      filter(Group == group2) %>%
+      st_drop_geometry()  # Eliminar geometría para operaciones no espaciales
+    
+    # Calcular la distancia de Wasserstein entre los grupos para el año 2024
+    wasserstein_distance <- calculate_wasserstein(group_data_2024_group1$Mean_ndvi_, group_data_2024_group2$Mean_ndvi_)
+    wasserstein_results <- rbind(wasserstein_results, data.frame(Group1 = group1, Group2 = group2, Wasserstein_Distance = wasserstein_distance))
+  }
+}
+
+# Imprimir las distancias de Wasserstein
+print(wasserstein_results)
+
+
+########################################################################################################
+#CORRECCION ANTERIOR
+
+#############################################################################################################################
+####CALULOS UNITARIOS
+#############################################################################
+#CALCULO DE CUANTILES PARA 1 SOLO POLY
+
+# Calcular los cuantiles
+percentiles_2023 <- quantile(donoso_2023_sf$Mean_ndvi_, probs = c(0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9,1), na.rm = TRUE)
+percentiles_2024 <- quantile(donoso_2024_sf$Mean_ndvi_, probs = c(0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9,1), na.rm = TRUE)
+
+# Añadir -Inf y Inf para cubrir todos los posibles valores de NDVI
+breaks_2023 <- c(-Inf, percentiles_2023, Inf)
+breaks_2024 <- c(-Inf, percentiles_2024, Inf)
+
+# Asignar categorías según los cuantiles
+labels_2023 <- cut(donoso_2023_sf$Mean_ndvi_, breaks = breaks_2023, labels = c(1,2,3,4,5,6,7,8,9,10,11))
+labels_2024 <- cut(donoso_2024_sf$Mean_ndvi_, breaks = breaks_2024, labels = c(1,2,3,4,5,6,7,8,9,10,11))
+
+# Agregar las nuevas categorías a los dataframes
+donoso_2023_sf$NDVI_Category <- labels_2023
+donoso_2024_sf$NDVI_Category <- labels_2024
+
+# Opcional: Mostrar una tabla con las primeras filas de los datos categorizados
+head(donoso_2023_sf[c("Mean_ndvi_", "NDVI_Category")])
+head(donoso_2024_sf[c("Mean_ndvi_", "NDVI_Category")])
+
+# Filtrar para ID_Poly_po = 9 para ambos años
+filtered_2023_sf <- donoso_2023_sf %>% 
+  filter(ID_Poly_po == 9) %>%
+  st_drop_geometry()  # Eliminar geometría para operaciones no espaciales
+
+filtered_2024_sf <- donoso_2024_sf %>% 
+  filter(ID_Poly_po == 9) %>%
+  st_drop_geometry()  # Eliminar geometría para operaciones no espaciales
+
+# Calcular las frecuencias para 2023
+frequencies_2023 <- filtered_2023_sf %>%
+  group_by(NDVI_Category) %>%
+  summarise(Frequency_2023 = n(), .groups = 'drop')
+
+# Calcular las frecuencias para 2024
+frequencies_2024 <- filtered_2024_sf %>%
+  group_by(NDVI_Category) %>%
+  summarise(Frequency_2024 = n(), .groups = 'drop')
+
+# Combinar las tablas de frecuencias de 2023 y 2024
+combined_frequencies <- full_join(frequencies_2023, frequencies_2024, by = "NDVI_Category")
+
+# Ordenar la tabla por NDVI_Category para mejorar la legibilidad
+final_table <- combined_frequencies %>%
+  arrange(NDVI_Category)
+
+# Imprimir la tabla final
+print(final_table)
+
+# Filtrar para ID_Poly_po = 9
+subset_2023_sf <- donoso_2024_sf[donoso_2023_sf$ID_Poly_po == 9, ]
+
+# Asegurarse de que los datos estén en el rango -1 a 1 (si necesario)
+subset_2023_sf <- subset_2023_sf[subset_2023_sf$Mean_ndvi_ >= -1 & subset_2023_sf$Mean_ndvi_ <= 1, ]
+
+# Calcular los percentiles para el NDVI
+percentiles_2023_id9 <- quantile(subset_2023_sf$Mean_ndvi_, probs = c(0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1), na.rm = TRUE)
+
+# Imprimir los resultados
+print(percentiles_2023_id9)
+
+
+#############################################################################
+#APLICACION DE WEISSERSTEIN DISTANCE PARA 1 SOLO POLY
+
+# Filtrar para ID_Poly_po = 10
+subset_data_2023 <- donoso_2023_sf[donoso_2023_sf$ID_Poly_po == 9, ]
+subset_data_2024 <- donoso_2024_sf[donoso_2024_sf$ID_Poly_po == 9, ]
+
+# Asegurarse que los datos estén en el rango -1 a 1
+subset_data_2023 <- subset_data_2023[subset_data_2023$Mean_ndvi_ >= -1 & subset_data_2023$Mean_ndvi_ <= 1, ]
+subset_data_2024 <- subset_data_2024[subset_data_2024$Mean_ndvi_ >= -1 & subset_data_2024$Mean_ndvi_ <= 1, ]
+
+# Histogramas con un número fijo de bins y un rango específico
+breaks <- seq(-1, 1, length.out = 11)  # Asegura 10 bins iguales
+hist_2023 <- hist(subset_data_2023$Mean_ndvi_, plot = FALSE, breaks = breaks, right = FALSE)
+hist_2024 <- hist(subset_data_2024$Mean_ndvi_, plot = FALSE, breaks = breaks, right = FALSE)
+
+# Normalizar los histogramas
+total_mass_2023 <- sum(hist_2023$counts)
+total_mass_2024 <- sum(hist_2024$counts)
+normalized_hist_2023 <- hist_2023$counts / total_mass_2023
+normalized_hist_2024 <- hist_2024$counts / total_mass_2024
+
+# Crear una matriz de costos asumiendo que los histogramas están igualmente espaciados
+bin_count <- length(hist_2023$breaks) - 1
+cost_matrix <- matrix(0, nrow = bin_count, ncol = bin_count)
+for (i in 1:bin_count) {
+  for (j in 1:bin_count) {
+    cost_matrix[i, j] <- abs(i - j)  # Simple cost: distance between indices
+  }
+}
+
+# Calcular la distancia de Wasserstein
+if (length(normalized_hist_2023) > 0 && length(normalized_hist_2024) > 0 && total_mass_2023 > 0 && total_mass_2024 > 0) {
+  wasserstein_distance <- wasserstein(normalized_hist_2023, normalized_hist_2024, costm = cost_matrix)
+  print(paste("Wasserstein distance for ID_Poly_po 10:", wasserstein_distance))
+} else {
+  print("Insufficient data for Wasserstein distance calculation for ID_Poly_po 10")
+}
+
+# Crear dataframes de las frecuencias de los bins para cada año
+decile_labels <- sapply(1:10, function(i) paste(round(hist_2023$breaks[i], 2), "-", round(hist_2023$breaks[i+1], 2)))
+decile_data <- data.frame(
+  Decile = decile_labels,
+  Frequency_2023 = hist_2023$counts,
+  Frequency_2024 = hist_2024$counts
+)
+
+# Imprimir el dataframe
+print(decile_data)
+
+
+#############################################################################
+#GRAFICO DE FRECUENCIAS PARA 1 SOLO POLY
+
+# Combine the datasets with pre-defined NDVI categories
+donoso_2023_sf$Year <- "2023"
+donoso_2024_sf$Year <- "2024"
+combined_data <- rbind(donoso_2023_sf, donoso_2024_sf)
+
+# Filter for specific ID_Poly_po and valid data
+filtered_data <- combined_data %>%
+  filter(ID_Poly_po == 9, !is.na(NDVI_Category))
+
+plot_data <- filtered_data %>%
+  group_by(NDVI_Category, Year) %>%
+  summarise(Count = n(), .groups = 'drop') %>%
+  mutate(Area = ifelse(Year == "2023", Count * area_per_pixel_2023, Count * area_per_pixel_2024))
+
+p <- ggplot(plot_data, aes(x = NDVI_Category, y = Area, fill = Year)) +
+  geom_bar(stat = "identity", position = position_dodge(0.8), color = "black") +
+  geom_vline(xintercept = 5.5, linetype = "dashed", color = "red", size = 1) +
+  annotate("text", x = 5.5, y = max(plot_data$Area), label = "Límite estimado de la actividad fotosintética", 
+           angle = 90, vjust = -0.5, hjust = 1, color = "red") +
+  scale_y_continuous(labels = function(x) format(x, big.mark = ".", decimal.mark = ",")) +
+  labs(title = "Categorías de NDVI para la unidad n° 9",
+       x = "Categoría de NDVI",
+       y = "Área (m2)",
+       fill="Año") +
+  theme_minimal()
+
+print(p)
