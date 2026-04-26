@@ -54,9 +54,9 @@ datos_combinados <- rbind(df_2023, df_2024, df_2025, df_2026)
 # Agrupación manual de unidades con nombres descriptivos
 datos_combinados <- datos_combinados %>%
   mutate(Grupo = case_when(
-    ID_Poly_po %in% c(5, 7)                      ~ "Formación de Carex macloviana",
-    ID_Poly_po %in% c(6, 8, 9, 10, 11, 12, 13)  ~ "Formación de Patosia clandestina y Carex macloviana",
-    ID_Poly_po %in% c(1, 2, 3, 4)               ~ "Patosia clandestina y Zameioscirpus gaimardioides",
+    ID_Poly_po %in% c(5, 7)                     ~ "Formación de Carex macloviana",
+    ID_Poly_po %in% c(6, 8, 9, 10, 11, 12, 13) ~ "Formación de Patosia clandestina y Carex macloviana",
+    ID_Poly_po %in% c(1, 2, 3, 4)              ~ "Patosia clandestina y Zameioscirpus gaimardioides",
     TRUE ~ NA_character_
   ))
 
@@ -78,10 +78,12 @@ for (grupo in unique(na.omit(datos_combinados$Grupo))) {
     geom_text(aes(label = percent(Proporcion, accuracy = 0.1)), color = "black", size = 3.5) +
     scale_fill_gradient(name = "% del área", low = "#e5f5e0", high = "#238b45",
                         labels = percent_format(accuracy = 0.05)) +
-    labs(title = paste("Distribución relativa de NDVI por deciles:", grupo),
+    labs(title = paste("Distribución relativa de NDVI por deciles:\n", grupo),
          x = "Decil NDVI", y = "Año") +
     theme_minimal() +
-    theme(plot.title = element_text(hjust = 0.5, face = "bold"))
+    theme(
+      plot.title = element_text(hjust = 0.5, face = "bold", size = 10)
+    )
   
   print(p)
 }
@@ -102,10 +104,12 @@ for (id in unique(datos_combinados$ID_Poly_po)) {
     geom_text(aes(label = percent(Proporcion, accuracy = 0.1)), color = "black", size = 3.5) +
     scale_fill_gradient(name = "% del área", low = "#e5f5e0", high = "#238b45",
                         labels = percent_format(accuracy = 0.05)) +
-    labs(title = paste("Distribución relativa de NDVI por deciles: Unidad", id),
+    labs(title = paste("Distribución relativa de NDVI por deciles:\nUnidad", id),
          x = "Decil NDVI", y = "Año") +
     theme_minimal() +
-    theme(plot.title = element_text(hjust = 0.5, face = "bold"))
+    theme(
+      plot.title = element_text(hjust = 0.5, face = "bold", size = 10)
+    )
   
   print(p)
 }
@@ -137,13 +141,13 @@ for (grupo in unique(na.omit(datos_combinados$Grupo))) {
     geom_text(aes(y = D5, label = round(D5, 3)),
               vjust = -1, color = "#238b45", fontface = "bold", size = 3.5) +
     labs(
-      title    = paste("Evolución del NDVI:", grupo),
+      title    = paste("Evolución del NDVI:\n", grupo),
       subtitle = "Línea = mediana (D5)  |  Banda = rango D2–D8 (60% central de los datos)",
       x = "Año", y = "NDVI"
     ) +
     theme_minimal() +
     theme(
-      plot.title    = element_text(hjust = 0.5, face = "bold"),
+      plot.title    = element_text(hjust = 0.5, face = "bold", size = 10),
       plot.subtitle = element_text(hjust = 0.5, color = "gray40", size = 9)
     )
   
@@ -176,7 +180,7 @@ for (id in unique(datos_combinados$ID_Poly_po)) {
     ) +
     theme_minimal() +
     theme(
-      plot.title    = element_text(hjust = 0.5, face = "bold"),
+      plot.title    = element_text(hjust = 0.5, face = "bold", size = 10),
       plot.subtitle = element_text(hjust = 0.5, color = "gray40", size = 9)
     )
   
@@ -191,9 +195,9 @@ comparaciones <- list(c("2023", "2024"), c("2024", "2025"), c("2025", "2026"))
 
 # --- POR UNIDAD ---
 wasserstein_unidades <- tibble(
-  Unidad     = integer(),
+  Unidad      = integer(),
   Comparación = character(),
-  Distancia  = numeric()
+  Distancia   = numeric()
 )
 
 for (id in unique(datos_combinados$ID_Poly_po)) {
@@ -205,9 +209,9 @@ for (id in unique(datos_combinados$ID_Poly_po)) {
       filter(ID_Poly_po == id, Year == comp[2], !is.na(Mean_ndvi_),
              Mean_ndvi_ >= -1, Mean_ndvi_ <= 1) %>% pull(Mean_ndvi_)
     
-    breaks  <- seq(-1, 1, length.out = 11)
-    hist_a  <- hist(a, breaks = breaks, plot = FALSE)$counts
-    hist_b  <- hist(b, breaks = breaks, plot = FALSE)$counts
+    breaks <- seq(-1, 1, length.out = 11)
+    hist_a <- hist(a, breaks = breaks, plot = FALSE)$counts
+    hist_b <- hist(b, breaks = breaks, plot = FALSE)$counts
     
     if (sum(hist_a) > 0 && sum(hist_b) > 0) {
       norm_a      <- hist_a / sum(hist_a)
@@ -255,9 +259,9 @@ for (grupo in unique(na.omit(datos_combinados$Grupo))) {
       filter(Grupo == grupo, Year == comp[2], !is.na(Mean_ndvi_),
              Mean_ndvi_ >= -1, Mean_ndvi_ <= 1) %>% pull(Mean_ndvi_)
     
-    breaks  <- seq(-1, 1, length.out = 11)
-    hist_a  <- hist(a, breaks = breaks, plot = FALSE)$counts
-    hist_b  <- hist(b, breaks = breaks, plot = FALSE)$counts
+    breaks <- seq(-1, 1, length.out = 11)
+    hist_a <- hist(a, breaks = breaks, plot = FALSE)$counts
+    hist_b <- hist(b, breaks = breaks, plot = FALSE)$counts
     
     if (sum(hist_a) > 0 && sum(hist_b) > 0) {
       norm_a      <- hist_a / sum(hist_a)
